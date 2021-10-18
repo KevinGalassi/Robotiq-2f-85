@@ -37,13 +37,8 @@
 
 
 
-"""@package docstring
-Module comModbusRtu: defines a class which communicates with Robotiq Grippers using the Modbus RTU protocol. 
-
-The module depends on pymodbus (http://code.google.com/p/pymodbus/) for the Modbus RTU client.
-"""
-
 from pymodbus.client.sync import ModbusSerialClient
+from pymodbus.exceptions import ModbusIOException
 from math import ceil
 
 class communication:	
@@ -55,7 +50,7 @@ class communication:
       """Connection to the client - the method takes the IP address (as a string, e.g. '192.168.1.11') as an argument."""
       self.client = ModbusSerialClient(method='rtu',port=device,stopbits=1, bytesize=8, baudrate=115200, timeout=0.2)
       if not self.client.connect():
-          print "Unable to connect to %s" % device
+          print("Unable to connect to %s" % device)
           return False
       return True
 
@@ -73,11 +68,16 @@ class communication:
       message = []
 
       #Fill message by combining two bytes in one register
-      for i in range(0, len(data)/2):
+      for i in range(0, int(len(data)/2)):
          message.append((data[2*i] << 8) + data[2*i+1])
 
       #To do!: Implement try/except 
-      self.client.write_registers(0x03E8, message, unit=0x0009)
+      try:
+         self.client.write_registers(0x03E8, message, unit=0x0009)
+      except:
+         print("Modbus write operation failure")
+         return False
+      return True
 
    def getStatus(self, numBytes):
       """Sends a request to read, wait for the response and returns the Gripper status. The method gets the number of bytes to read as an argument"""
@@ -85,7 +85,18 @@ class communication:
 
       #To do!: Implement try/except 
       #Get status from the device
-      response = self.client.read_holding_registers(0x07D0, numRegs, unit=0x0009)
+      try:
+        response = self.client.read_holding_registers(0x07D0, numRegs, unit=0x0009)
+      except Exception as e:
+        print(e)
+        return None
+
+  
+      # When reading failes, response is of type ModbusIOException (None in original packages)
+        
+      if isinstance(response, ModbusIOException):
+      #   print("Failed to receive status")
+        return None
 
       #Instantiate output as an empty list
       output = []
