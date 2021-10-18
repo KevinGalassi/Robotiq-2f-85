@@ -1,3 +1,9 @@
+# Introduction
+## Important Notes
+This package is a modificication of the package realized by [Danfoa](https://github.com/Danfoa/robotiq_2finger_grippers) and <b>all credits goes to them </b>, in this repo you will find only the packages needed for the comunication with a 2f-85 gripper. The original modbus_rtu comunication has been modified to catch a <u>ModbusRTU exception</u> that was causing the lost of the connection with the gripper.
+
+
+#
 This package contains the necesary files to connect and control the Robotiq 2 finger adaptive grippers (85mm and 140mm stroke) of the `C` series through a **USB port using the Modbus RTU communication protocol**. (Currently only URDF descriptions of models C3 are available)
 
 ![C3 models](https://user-images.githubusercontent.com/8356912/52115661-78872b00-260f-11e9-8eb3-960747131df6.jpg)
@@ -12,20 +18,22 @@ Note: This package is based on [waypointrobotics/robotiq_85_gripper](https://git
 
 *A pull request to this packages requires further analysis since I performed many structural changes, which will create conflict for previous users.*
 ### Ros Distro
-This package has been tested on `Kinetic` and `Melodic` and `Noetic`'.
+This package has been tested on `Kinetic` and `Melodic` and `Noetic`.
 # Contents
+- [Introduction](#introduction)
+  - [Important Notes](#important-notes)
+    - [Ros Distro](#ros-distro)
 - [Contents](#contents)
 - [Operation Instructions](#operation-instructions)
   - [Serial Port Configuration](#serial-port-configuration)
   - [Test communication and control](#test-communication-and-control)
 - [Documentation](#documentation)
   - [Control Robotiq gripper/s](#control-robotiq-grippers)
-    - [Node `robotiq_2f_action_server`](#node-robotiq2factionserver)
+    - [Node `robotiq_2f_action_server`](#node-robotiq_2f_action_server)
       - [Arguments:](#arguments)
       - [Action type:](#action-type)
     - [Command gripper through an instance of a `SimpleActionClient` in Python](#command-gripper-through-an-instance-of-a-simpleactionclient-in-python)
     - [Command gripper through an instance of a `SimpleActionClient` in C++](#command-gripper-through-an-instance-of-a-simpleactionclient-in-c)
-  - [Operation of Multiple Grippers](#operation-of-multiple-grippers)
 # Operation Instructions
 
 Prior to executing control of the grippers make sure you have connected a [_2-finger adaptive gripper model_](https://robotiq.com/support/2-finger-adaptive-robot-gripper) to a USB port of your computer. The RS-485 to USB converter _ACC-ADT-USB-RS485_ that comes by default when you order these grippers allow connecting the 2-finger gripper directly to a computer through a USB 2.0 port using Modbus RTU communication protocol.
