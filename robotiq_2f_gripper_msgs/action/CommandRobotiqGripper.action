@@ -1,3 +1,5 @@
+# See Robotiq documentation for fields documentation.
+# See Robotiq documentation for fields documentation.
 
 #goal definition
 bool emergency_release

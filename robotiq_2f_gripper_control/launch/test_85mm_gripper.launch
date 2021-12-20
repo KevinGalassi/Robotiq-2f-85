@@ -3,7 +3,8 @@
     <arg name="sim" default="false"/>
     <arg name="comport" default="/dev/ttyUSB0" unless="$(arg sim)"/> 
     <arg name="baud" default="115200" unless="$(arg sim)"/> 
-    
+    <arg name="rviz" default="False" />
+
     <!-- Launch action server for gripper -->
     <include file="$(find robotiq_2f_gripper_control)/launch/robotiq_action_server.launch">
         <arg name="comport" value="$(arg comport)" unless="$(arg sim)"/>
@@ -32,5 +33,7 @@
         <rosparam param="use_gui">false</rosparam>
     </node>
 
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robotiq_2f_85_gripper_visualization)/visualize.rviz" required="true" />
+    <group if="$(arg rviz)" >
+        <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robotiq_2f_85_gripper_visualization)/visualize.rviz" required="true" />
+    </group>
 </launch>

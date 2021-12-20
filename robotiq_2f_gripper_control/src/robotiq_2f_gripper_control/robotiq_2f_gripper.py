@@ -51,17 +51,17 @@ class Robotiq2FingerGripper:
         """Request the status from the gripper and return it in the Robotiq2FGripper_robot_input msg type."""
 
         #Acquire status from the Gripper
-        status = self.client.getStatus(6);
+        status = self.client.getStatus(6)
 
         # Check if read was successful
         if( status is None ):
           return False
 
         #Assign the values to their respective variables
-        self.gACT = (status[0] >> 0) & 0x01;        
-        self.gGTO = (status[0] >> 3) & 0x01;
-        self.gSTA = (status[0] >> 4) & 0x03;
-        self.gOBJ = (status[0] >> 6) & 0x03;
+        self.gACT = (status[0] >> 0) & 0x01        
+        self.gGTO = (status[0] >> 3) & 0x01
+        self.gSTA = (status[0] >> 4) & 0x03
+        self.gOBJ = (status[0] >> 6) & 0x03
         self.gFLT =  status[2]
         self.gPR  =  status[3]
         self.gPO  =  status[4]

@@ -1,11 +1,11 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import rospy
 
 # Brings in the SimpleActionClient
 import actionlib
 
-from robotiq_2f_gripper_msgs.msg import CommandRobotiqGripperAction, CommandRobotiqGripperGoal
+from robotiq_2f_gripper_msgs.msg import CommandRobotiqGripperFeedback, CommandRobotiqGripperResult, CommandRobotiqGripperAction, CommandRobotiqGripperGoal
 from robotiq_2f_gripper_control.robotiq_2f_gripper_driver import Robotiq2FingerGripperDriver as Robotiq
 
 def operate_gripper():
@@ -42,8 +42,7 @@ def operate_gripper():
         # break
 
     # Prints out the result of executing the action
-    return robotiq_client.get_result()  
-    
+    return robotiq_client.get_result()  # A FibonacciResult
 
 if __name__ == '__main__':
     # Initializes a rospy node so that the SimpleActionClient can

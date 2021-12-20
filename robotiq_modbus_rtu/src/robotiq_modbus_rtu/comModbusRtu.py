@@ -37,20 +37,28 @@
 
 
 
+"""@package docstring
+Module comModbusRtu: defines a class which communicates with Robotiq Grippers using the Modbus RTU protocol. 
+
+The module depends on pymodbus (http://code.google.com/p/pymodbus/) for the Modbus RTU client.
+"""
+
 from pymodbus.client.sync import ModbusSerialClient
 from pymodbus.exceptions import ModbusIOException
 from math import ceil
+import arrow
 
 class communication:	
 
    def __init__(self):
+      self.log_time = arrow.utcnow()
       self.client = None
       
    def connectToDevice(self, device):
       """Connection to the client - the method takes the IP address (as a string, e.g. '192.168.1.11') as an argument."""
       self.client = ModbusSerialClient(method='rtu',port=device,stopbits=1, bytesize=8, baudrate=115200, timeout=0.2)
       if not self.client.connect():
-          print("Unable to connect to %s" % device)
+          print("Unable to connect to {}".format(device))
           return False
       return True
 
@@ -68,7 +76,7 @@ class communication:
       message = []
 
       #Fill message by combining two bytes in one register
-      for i in range(0, int(len(data)/2)):
+      for i in range(0, int(len((data))/2)):
          message.append((data[2*i] << 8) + data[2*i+1])
 
       #To do!: Implement try/except 
@@ -83,6 +91,13 @@ class communication:
       """Sends a request to read, wait for the response and returns the Gripper status. The method gets the number of bytes to read as an argument"""
       numRegs = int(ceil(numBytes/2.0))
 
+      '''
+      time = arrow.utcnow()
+      if (time-self.log_time).to_sec() > 10 :
+         log_time = time
+         print('Gripper status : Operative')
+      '''
+
       #To do!: Implement try/except 
       #Get status from the device
       try:
@@ -91,10 +106,9 @@ class communication:
         print(e)
         return None
 
-  
-      # When reading failes, response is of type ModbusIOException (None in original packages)
-        
-      if isinstance(response, ModbusIOException):
+
+      # When reading failes, response is of type None 
+      if isinstance(response,ModbusIOException):
       #   print("Failed to receive status")
         return None
 

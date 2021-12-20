@@ -1,12 +1,32 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+"""--------------------------------------------------------------------
+This Node/Script creates an instance of a `SimpleActionServer` dedicated to receive, 
+process and execute user commands for the Robotiq 2 finger adaptive grippers.
 
+The action type is defined in the `robotiq_2f_gripper_msgs` as `CommandRobotiqGripper.action` and
+the default action name is `/command_robotiq_action` but you can namespace it for multiple grippers
+control.
+
+See the `robotiq_action_server.launch` file on this package for an example on how to call this node.
+
+Parameters:
+    comport: USB Communication port to which the gripper is connected to (not needed in `sim` mode).  
+    baud: Baudrate of communication with gripper (not needed in `sim` mode).
+    stroke: Maximum distance in meters, between the gripper fingers (Only 0,085 and 0.140 are currently supported)
+    joint_name: Name of the URDF gripper actuated joints to publish on the `/joint_state` topic 
+    sim: Boolean indicating whether to use a simulated gripper or try to connect to a real one.
+    rate: Frequency in Herz to update the gripper variables (command, joint_state, gripper_state)
+
+@author: Daniel Felipe Ordonez Apraez
+@email: daniels.ordonez@gmail.com
+--------------------------------------------------------------------"""
 import rospy
 from robotiq_2f_gripper_control.robotiq_2f_gripper_driver import Robotiq2FingerGripperDriver, Robotiq2FingerSimulatedGripperDriver 
 import actionlib
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryResult, FollowJointTrajectoryFeedback, FollowJointTrajectoryGoal
 from robotiq_2f_gripper_msgs.msg import CommandRobotiqGripperFeedback, CommandRobotiqGripperResult, CommandRobotiqGripperAction, CommandRobotiqGripperGoal
 
-GOAL_DETECTION_THRESHOLD = 0.05 # Max deviation from target goal to consider as goal "reached"
+GOAL_DETECTION_THRESHOLD = 0.01 # Max deviation from target goal to consider as goal "reached"
 
 class CommandGripperActionServer(object):
 
@@ -43,13 +63,10 @@ class CommandGripperActionServer(object):
     
     def execute_cb(self, goal_command):
       rospy.logdebug( (self._action_name + ": New goal received Pos:%.3f Speed: %.3f Force: %.3f Force-Stop: %r") % (goal_command.position, goal_command.speed, goal_command.force, goal_command.stop) )
-      
       # Send incoming command to gripper driver
       self._driver.update_gripper_command(goal_command)
-
       # Wait until command is received by the gripper 
       rospy.sleep(rospy.Duration(0.1))
-      
       # Set Action Server as active === processing goal...
       self._processing_goal = True        
       
@@ -66,7 +83,6 @@ class CommandGripperActionServer(object):
           feedback = self._driver.get_current_gripper_status()
           self._action_server.publish_feedback( feedback )
           rospy.logdebug("Error = %.5f Requested position = %.3f Current position = %.3f" % (abs(feedback.requested_position - feedback.position), feedback.requested_position, feedback.position))
-          
           # Check for completition of action 
           if( feedback.fault_status != 0 and not self._is_stalled):               # Check for errors
               rospy.logerr(self._action_name + ": fault status (gFLT) is: %d", feedback.fault_status)
@@ -134,16 +150,13 @@ class CommandGripperActionServer(object):
         result.error_string = "Invalid joint position on trajectory point "
         self._joint_trajectory_action_server.set_aborted(result)
         return
-
       target_speed = goal_trajectory_point.velocities[0] if len(goal_trajectory_point.velocities) > 0 else 0.01
       target_force = goal_trajectory_point.effort[0] if len(goal_trajectory_point.effort) > 0 else 0.1
       goal_command.position = self._driver.from_radians_to_distance(goal_trajectory_point.positions[0])
       goal_command.speed = abs(target_speed) # To-Do: Convert to rad/s
       goal_command.force = target_force
-      
       # Send incoming command to gripper driver
       self._driver.update_gripper_command(goal_command)
-      
       # Set feedback desired value 
       feedback.desired.positions = [goal_trajectory_point.positions[0]]
       
@@ -165,7 +178,6 @@ class CommandGripperActionServer(object):
           result.error_string = "Gripper fault status (gFLT): " + current_status.fault_status
           self._joint_trajectory_action_server.set_aborted(result)
           return
-
         # Check if object was detected
         if current_status.obj_detected:     
           watchdog.shutdown()                         # Stop timeout watchdog.
@@ -175,7 +187,6 @@ class CommandGripperActionServer(object):
           result.error_string = "Object detected/grasped" 
           self._joint_trajectory_action_server.set_succeeded(result)  
           return
-
         # Check if current trajectory point was reached 
         if error < GOAL_DETECTION_THRESHOLD :      
           break
@@ -201,24 +212,26 @@ if __name__ == "__main__":
     rospy.init_node('robotiq_2f_action_server')
 
     # Get Node parameters
+    print('AS get Param')
     comport = rospy.get_param('~comport','/dev/ttyUSB0')
     baud = rospy.get_param('~baud','115200')
     stroke = rospy.get_param('~stroke', 0.085)                # Default stroke is 85mm (Small C / 2 finger adaptive gripper model)
-    joint_name = rospy.get_param('~joint_name', 'finger_joint')    
+    joint_name = rospy.get_param('~joint_name', 'robotiq_finger_joint')    
     sim = rospy.get_param('~sim', False)    
 
     # Create instance of Robotiq Gripper Driver
     if sim: # Use simulated gripper
         gripper_driver = Robotiq2FingerSimulatedGripperDriver( stroke=stroke, joint_name=joint_name)    
     else:   # Try to connect to a real gripper 
-        gripper_driver = Robotiq2FingerGripperDriver( comport=comport, baud=baud, stroke=stroke, joint_name=joint_name)
-    
+        print('Connection to gripper')
+        gripper_driver = Robotiq2FingerGripperDriver( comport=comport, baud=baud, stroke=stroke, joint_name=joint_name, client_name='command_robotiq_action')
     # Start action server 
     server = CommandGripperActionServer(rospy.get_namespace(), 'command_robotiq_action', gripper_driver)
     
     # Send and Request data from gripper and update joint state every `r`[Hz]
     r = rospy.Rate(rospy.get_param('~rate', 50 if not sim else 20))
     while not rospy.is_shutdown():
+        rospy.loginfo_throttle(5, 'Gripper action server operative')
         gripper_driver.update_driver()
         r.sleep()
 

@@ -9,16 +9,15 @@ The end user should not need to use this class direcly since an instance of it i
 controlling a given gripper, and commanded by the user commands puubished by an action client instance.  
 """
 
-import sys
-import os
-sys.path.append('/home/kvn/ros/catkin_ws/src/robotiq_2finger_grippers/robotiq_2f_gripper_control/src/robotiq_2f_gripper_control')
+from robotiq_2f_gripper_control.robotiq_2f_gripper import Robotiq2FingerGripper
+from robotiq_2f_gripper_msgs.msg import RobotiqGripperStatus, CommandRobotiqGripperGoal
 
-from robotiq_2f_gripper import Robotiq2FingerGripper
-from robotiq_2f_gripper_msgs.msg import RobotiqGripperCommand, RobotiqGripperStatus, CommandRobotiqGripperGoal
 from sensor_msgs.msg import JointState
 import numpy as np
 import rospy
-from enum import Enum
+import actionlib
+from robotiq_2f_gripper_msgs.msg import CommandRobotiqGripperFeedback, CommandRobotiqGripperResult, CommandRobotiqGripperAction, CommandRobotiqGripperGoal
+
 
 WATCHDOG_TIME = 1.0   # Max Time without communication with gripper allowed
 
@@ -43,17 +42,22 @@ class Robotiq2FingerGripperDriver:
                             1: Driver is running
                             2: Gripper has been activated
     """
-    def __init__(self, comport = '/dev/ttyUSB0', baud = '115200', stroke = 0.085, joint_name='finger_joint'):
+    def __init__(self, comport = '/dev/ttyUSB0', baud = '115200', stroke = 0.085, joint_name='robotiq_finger_joint', client_name='command_robotiq_action', init_requested = True):
         self._comport = comport
         self._baud = baud
         self._joint_name = joint_name          
-        
+        self._stroke = stroke
 
         # Instanciate and open communication with gripper.
-        self._gripper = Robotiq2FingerGripper(device_id=0, stroke=stroke, comport=self._comport, baud=self._baud)
-        
+        self._gripper = Robotiq2FingerGripper(device_id=0, stroke=self._stroke, comport=self._comport, baud=self._baud)
+
+        self.robotiq_client = actionlib.SimpleActionClient(client_name, CommandRobotiqGripperAction)
+        print('Wait for {}'.format(client_name))
+        #self.robotiq_client.wait_for_server()    
+
+
         self._max_joint_limit = 0.8
-        if self._gripper.stroke == 0.140 :
+        if( self._gripper.stroke == 0.140 ):
             self._max_joint_limit = 0.7
         
         if not self._gripper.init_success:
@@ -70,13 +74,18 @@ class Robotiq2FingerGripperDriver:
         self._driver_state = 0
         self.is_ready = False
         
-        if not self._gripper.getStatus():
-            rospy.logerr("Failed to contact gripper on port %s ... ABORTING" % self._comport)
-            return                
-                
-        self._run_driver()
-        self._last_update_time = rospy.get_time()
+
+
+        if init_requested :
+            if not self._gripper.getStatus():
+                rospy.logerr("Failed to contact gripper on port %s ... ABORTING" % self._comport)
+                return                
+                    
+            self._run_driver()
         
+        self._last_update_time = rospy.get_time()
+        print('Gripper init completed')
+
     def _clamp_position(self,cmd):
         out_of_bouds = False
         if (cmd <= 0.0):
@@ -268,6 +277,128 @@ class Robotiq2FingerGripperDriver:
       
     def get_current_joint_position(self):
       return self.from_distance_to_radians(self._gripper.get_pos())
+    
+
+    ###### FUNCTION WITHIN THE CLASS
+
+    def goto(self, pos, speed=0.1, force=120, block = True ):
+        """
+        Static function to update the gripper command
+
+        Args:
+            client: `SimpleActionClient` instance connected to the action server holding a robotiq gripper
+            instance.
+            pos: [m] Position (distance in between fingers) in meters desired for the gripper.
+            speed: [m/s] Motion speed in meters over seconds. Min value: 0.013[m/s] - Max value: 0.1[m/s]
+            force: [%] Force value to apply in gripper motion, see robotiq manuals to calculate an appropiate
+                    gripping force value in Newtons.  
+            block: Boolean indicating whether to lock the current thread until command has been reached or not.
+        """
+        goal = CommandRobotiqGripperGoal()
+        goal.emergency_release = False
+        goal.stop = False
+        goal.position = pos
+        goal.speed = speed
+        goal.force = force
+
+        # Sends the goal to the gripper.
+        if block:   
+            self.robotiq_client.send_goal(goal)
+            self.robotiq_client.wait_for_result()
+        else:
+            self.robotiq_client.send_goal(goal)
+    
+    def close( self, speed=0.1, force=120, block = True):
+        """
+        Static function to close the gripper 
+
+        Args:
+            client: `SimpleActionClient` instance connected to the action server holding a robotiq gripper
+            instance.
+            speed: [m/s] Motion speed in meters over seconds. Min value: 0.013[m/s] - Max value: 0.1[m/s]
+            force: [%] Force value to apply in gripper motion, see robotiq manuals to calculate an appropiate
+                    gripping force value in Newtons.  
+            block: Boolean indicating whether to lock the current thread until command has been reached or not.
+        """
+        goal = CommandRobotiqGripperGoal()
+        goal.emergency_release = False
+        goal.stop = False
+        goal.position = 0.0
+        goal.speed = speed
+        goal.force = force
+
+        # Sends the goal to the gripper.
+        if block:
+            self.robotiq_client.send_goal_and_wait(goal)
+        else:
+            self.robotiq_client.send_goal(goal)
+
+    def open( self, speed=0.1, force=120, block = True):
+        """
+        Static function to open the gripper 
+
+        Args:
+            client: `SimpleActionClient` instance connected to the action server holding a robotiq gripper
+            instance.
+            speed: [m/s] Motion speed in meters over seconds. Min value: 0.013[m/s] - Max value: 0.1[m/s]
+            force: [%] Force value to apply in gripper motion, see robotiq manuals to calculate an appropiate
+                    gripping force value in Newtons.  
+            block: Boolean indicating whether to lock the current thread until command has been reached or not.
+        """
+        goal = CommandRobotiqGripperGoal()
+        goal.emergency_release = False
+        goal.stop = False
+        goal.position = 255 # Use max value to make it stroke independent
+        goal.speed = speed
+        goal.force = force
+
+        # Sends the goal to the gripper.
+        if block:
+            self.robotiq_client.send_goal_and_wait(goal)
+        else:
+            self.robotiq_client.send_goal(goal)
+
+    def stop( self, block = True):
+        """
+        Static function to stop gripper motion
+
+        Args:
+            client: `SimpleActionClient` instance connected to the action server holding a robotiq gripper
+            instance.
+            block: Boolean indicating whether to lock the current thread until command has been reached or not.
+        """
+        goal = CommandRobotiqGripperGoal()
+        goal.emergency_release = False
+        goal.stop = False
+
+        # Sends the goal to the gripper.
+        if block:
+            self.robotiq_client.send_goal_and_wait(goal)
+        else:
+            self.robotiq_client.send_goal(goal)
+
+    def emergency_release( self ):
+        """
+        Static function to trigger an emergency release motion.
+
+        Args:
+            client: `SimpleActionClient` instance connected to the action server holding a robotiq gripper
+            instance.
+        """
+        goal = CommandRobotiqGripperGoal()
+        goal.emergency_release = True
+        self.robotiq_client.send_goal_and_wait(goal)
+
+    def recovery(self) :
+        self._gripper = Robotiq2FingerGripper(device_id=0, stroke=self._stroke, comport=self._comport, baud=self._baud)
+
+        if not self._gripper.getStatus():
+            rospy.logerr("Failed to contact gripper on port %s ... ABORTING" % self._comport)
+            return                
+                
+        self._run_driver()
+        self._last_update_time = rospy.get_time()
+'''
     ######################################################################################################
     # STATIC functions for fast control of the gripper.
 
@@ -382,7 +513,7 @@ class Robotiq2FingerGripperDriver:
         """
         goal = CommandRobotiqGripperGoal()
         goal.emergency_release = True
-        client.send_goal_and_wait(goal)
+        client.send_goal_and_wait(goal)'''
 
 class Robotiq2FingerSimulatedGripperDriver:
     """
@@ -400,7 +531,7 @@ class Robotiq2FingerSimulatedGripperDriver:
         _current_joint_pos: [radians] Position of the simulated joint in radians.
         _current_goal: Instance of `RobotiqGripperCommand` message holding the latest user command.
     """
-    def __init__(self, stroke=0.085, joint_name='finger_joint'):
+    def __init__(self, stroke=0.085, joint_name='robotiq_finger_joint'):
         self._stroke = stroke
         self._joint_name = joint_name
         self._current_joint_pos = 0.0                                 
